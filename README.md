@@ -2,9 +2,11 @@
 
 [TOC]
 
-> @Version：V0.1.0
->
-> @Author: lebhoryi@gmail.com
+| Version | Date       | Description                  | Other |
+| ------- | ---------- | ---------------------------- | ----- |
+| v0.1.0  | 2021/07/06 | 火灾检测模型部署到 ART-PI 中 |       |
+|         |            |                              |       |
+|         |            |                              |       |
 
 怎么把生成 ART-PI，怎么使用 RT-AK，怎么使用 RT-Thread Sdutio 编译代码，请看下面这个链接：
 
