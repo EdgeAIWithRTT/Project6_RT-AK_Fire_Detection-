@@ -15,32 +15,31 @@
 #include <test.h>  // 64x64
 /* fire detection */
 
-int ai_run_complete_flag = 0;
 void ai_run_complete(void *arg){
     *(int*)arg = 1;
 }
 
 int fire_app(void){
+    int ai_run_complete_flag = 0;
     rt_err_t result = RT_EOK;
     static rt_ai_t model = NULL;
     rt_ai_buffer_t *work_buffer = rt_malloc(RT_AI_FIRE_WORK_BUFFER_BYTES+RT_AI_FIRE_IN_TOTAL_SIZE_BYTES+RT_AI_FIRE_OUT_TOTAL_SIZE_BYTES);
 
-    //find a registered model handle
+    // find a registered model handle
     model = rt_ai_find(RT_AI_FIRE_MODEL_NAME);
     if(!model) {rt_kprintf("ai model find err\r\n"); return -1;}
 
-    //init the model handle
+    // init the model and allocate memory
     result = rt_ai_init(model, work_buffer);
     if (result != 0) {rt_kprintf("ai init err\r\n"); return -1;}
 
-    //prepare input data
+    // prepare input data
     rt_memcpy(model->input[0], TEST, RT_AI_FIRE_IN_1_SIZE_BYTES);
     result = rt_ai_run(model, ai_run_complete, &ai_run_complete_flag);
     if (result != 0) {rt_kprintf("ai model run err\r\n"); return -1;}
 
-    //process the inference data
+    // get output and post-process the output
     if(ai_run_complete_flag){
-        //get inference data
         uint8_t *out = (uint8_t *)rt_ai_output(model, 0);
         rt_kprintf("pred: %d %d\n", out[0], out[1]);
         // AI_LOG("Prediction: %d\n", prediction);

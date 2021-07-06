@@ -1,60 +1,111 @@
-火灾烟雾模型
+# RT-AK 之 STM32 插件 Demo-Fire
+
+[TOC]
+
+> @Version：V0.1.0
+>
+> @Author: lebhoryi@gmail.com
+
+怎么把生成 ART-PI，怎么使用 RT-AK，怎么使用 RT-Thread Sdutio 编译代码，请看下面这个链接：
+
+[RT-AK 之 STM32 插件快速上手（附源码）](https://blog.csdn.net/weixin_37598106/article/details/118520343)
+
+## 1. 项目说明
+
+火灾二分类模型，仅检测图片中是否已经发生火灾
+
+基于神经网络实现火灾识别，掌握神经网络图像分类识别的基本原理。
+
+当模型训练完成之后，使用RT-AK框架，将模型一键部署到RT-Thread系统中。
 
 训练代码：https://github.com/Lebhoryi/FireNet-LightWeight-Network-for-Fire-Detection
 
+`Demo` 示例代码实现在 `appplications` 文件夹下面，其中文件说明：
 
-
-# LED闪烁例程
-
-## 简介
-
-本例程主要功能是让板载的 RGB-LED 中的蓝色 LED 不间断闪烁。
-这个例程也可以做为您的创作的基础工程。
-
-## 硬件说明
-<img src="./figures/blink_pcb.png" alt="LED 连接单片机引脚" style="zoom: 50%;" />
-如上图所示，RGB-LED 属于共阳 LED， **阴极** 分别与单片机的引脚相连，其中蓝色 LED 对应 PI8 引脚。单片机引脚输出低电平即可点亮 LED，输出高电平则会熄灭 LED。
-
-## 软件说明
-
-闪灯的源代码位于 `/projects/art_pi_blink_led/applications/main.c` 中。首先定义了一个宏 `LED_PIN` ，代表闪灯的 LED 引脚编号，然后与 `GPIO_LED_B`（**PI8**）对应：
-
-```
-#define LED_PIN GET_PIN(I, 8)
+```shell
+卷 软件 的文件夹 PATH 列表
+卷序列号为 E67E-D1CA
+D:.
+    fire_detection.c		// ai 模型推理应用代码实现
+    main.c			// artpi LED 闪烁灯例程原 main 函数，未改动
+    rt_ai_fire_model.c			// 与 STM32 平台相关的模型声明文件
+    rt_ai_fire_model.h			// 存放 ai 模型输入输出等相关信息文件
+    save_image.py			// 将图片保存成 xxx.h 文件形式，ai 模型推理用
+    SConscript
+    test.h			// 测试图片
+    test.jpg			// 测试图片
 ```
 
-在 main 函数中，将该引脚配置为输出模式，并在下面的 while 循环中，周期性（500毫秒）开关 LED。
+结果显示：
 
+![image-20210706133940472](https://gitee.com/lebhoryi/PicGoPictureBed/raw/master/img/20210706135440.png)
+
+---
+
+其中开启模型推理一次计时的宏定义是在 `rt_ai_lib/aiconfig.h` 文件中的第23行。
+
+![image-20210706141158050](https://gitee.com/lebhoryi/PicGoPictureBed/raw/master/img/20210706141226.png)
+
+## 2. 元件
+
+无
+
+## 3. 步骤
+
+### 3.1 代码流程
+
+**RT-AK Lib 模型加载并运行**：
+
+- 注册模型（代码自动注册，无需修改）
+- 找到注册模型
+- 初始化模型，挂载模型信息，准备运行环境
+- 运行（推理）模型
+- 获取输出结果
+
+### 3.2 核心代码
+
+```c
+// fire_detection.c
+
+...
+
+// 注册模型的代码在 rt_ai_mnist_model.c 文件下的第43行，代码自动执行
+// 模型的相关信息在 rt_ai_mnist_model.h 文件
+// find a registered model handle
+model = rt_ai_find(RT_AI_FIRE_MODEL_NAME);  // 找到模型
+...
+result = rt_ai_init(model, work_buffer);  // 初始化模型，传入输入数据
+...
+result = rt_ai_run(model, ai_run_complete, &ai_run_complete_flag);    // 模型推理一次
+...
+
+/* 获取模型输出结果 */
+uint8_t *out = (uint8_t *)rt_ai_output(model, 0);
 ```
-int main(void)
-{
-    rt_uint32_t count = 1;
 
-    rt_pin_mode(LED_PIN, PIN_MODE_OUTPUT);
+------
 
-    while(count++)
-    {
-        rt_thread_mdelay(500);
-        rt_pin_write(LED_PIN, PIN_HIGH);
-        rt_thread_mdelay(500);
-        rt_pin_write(LED_PIN, PIN_LOW);
-    }
-    return RT_EOK;
-}
-```
+**如何更换模型输入数据补充说明**：
 
+模型不用重新训练，只需要更改模型输入图片即可。
 
+`test.h` 是模型输入图片。
 
-## 运行
-### 编译&下载
+运行 `save_image.py` 文件即可获取上述文件。
 
-编译完成后，将开发板的 ST-Link USB 口与 PC 机连接，然后将固件下载至开发板。
+**main.c 代码修改**：
 
-### 运行效果
+​	修改第 37 行代码，改为新的图片变量名
 
-正常运行后，蓝色 LED 会周期性闪烁。
+![image-20210706142035865](https://gitee.com/lebhoryi/PicGoPictureBed/raw/master/img/20210706142035.png)
 
-## 注意事项
+### 3.3 编译说明
 
-如果想要修改`LED_PIN` 宏定义，可以通过 GET_PIN 来修改。
+这里我用的是 `RT-Thread Studio`
+
+![image-20210706142445929](https://gitee.com/lebhoryi/PicGoPictureBed/raw/master/img/20210706142450.png)
+
+## 4. 运行结果
+
+![image-20210706142543669](https://gitee.com/lebhoryi/PicGoPictureBed/raw/master/img/20210706142546.png)
 
