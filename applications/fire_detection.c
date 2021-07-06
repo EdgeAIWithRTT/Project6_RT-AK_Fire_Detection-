@@ -7,39 +7,53 @@
  * @FilePath: /art_pi/applications/fire_detection.c
  * @Description: fire detection demo app
  */
-
+#include "drv_spi_ili9488.h"  // spi lcd driver
+#include <lcd_spi_port.h>  // lcd ports
 #include <rt_ai_fire_model.h>
 #include <rt_ai.h>
 #include <rt_ai_log.h>
 
-#include <test.h>  // 64x64
+#include <logo.h>
+#include <test.h>
+
+struct rt_event ov2640_event;
+static rt_ai_t model = NULL;
 /* fire detection */
 
+int ai_run_complete_flag = 0;
 void ai_run_complete(void *arg){
     *(int*)arg = 1;
 }
 
 int fire_app(void){
-    int ai_run_complete_flag = 0;
-    rt_err_t result = RT_EOK;
-    static rt_ai_t model = NULL;
+    lcd_show_image(0, 0, 320, 240, LOGO);
+    lcd_show_string(90, 140, 16, "Hello RT-Thread!");
+    lcd_show_string(90, 156, 16, "Demo: Fire Detection");
+    rt_thread_mdelay(1000);
+    lcd_clear(BLACK);
+
+    int result = 0;
+
     rt_ai_buffer_t *work_buffer = rt_malloc(RT_AI_FIRE_WORK_BUFFER_BYTES+RT_AI_FIRE_IN_TOTAL_SIZE_BYTES+RT_AI_FIRE_OUT_TOTAL_SIZE_BYTES);
 
-    // find a registered model handle
+    //find a registered model handle
     model = rt_ai_find(RT_AI_FIRE_MODEL_NAME);
-    if(!model) {rt_kprintf("ai model find err\r\n"); return -1;}
-
-    // init the model and allocate memory
+    if(model == RT_AI_NULL){
+        return -1;
+    }
+    //init the model handle
     result = rt_ai_init(model, work_buffer);
-    if (result != 0) {rt_kprintf("ai init err\r\n"); return -1;}
+    if(result != 0){
+        return -1;
+    }
 
-    // prepare input data
+    //prepare input data
     rt_memcpy(model->input[0], TEST, RT_AI_FIRE_IN_1_SIZE_BYTES);
     result = rt_ai_run(model, ai_run_complete, &ai_run_complete_flag);
-    if (result != 0) {rt_kprintf("ai model run err\r\n"); return -1;}
 
-    // get output and post-process the output
+    //process the inference data
     if(ai_run_complete_flag){
+        //get inference data
         uint8_t *out = (uint8_t *)rt_ai_output(model, 0);
         rt_kprintf("pred: %d %d\n", out[0], out[1]);
         // AI_LOG("Prediction: %d\n", prediction);
@@ -47,4 +61,4 @@ int fire_app(void){
     rt_free(work_buffer);
     return 0;
 }
-MSH_CMD_EXPORT(fire_app, fire detection demo);
+MSH_CMD_EXPORT(fire_app,fire demo);

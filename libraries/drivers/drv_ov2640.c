@@ -24,18 +24,16 @@
 #define DEV_ADDRESS      0x30 /* OV2640 address */
 #define I2C_NAME        "i2c2"
 
-volatile rt_uint32_t jpeg_data_len = 0;
-volatile rt_uint8_t  jpeg_data_ok  = 0;
 struct rt_i2c_bus_device *i2c_bus  = RT_NULL;
 
-#define JPEG_BUF_SIZE   32 * 1024
-#define JPEG_LINE_SIZE  1 * 1024
+#define DCMI_BUF_SIZE   (320 * 240 *2)
+#define DCMI_LINE_SIZE  (38400)
 
 #define RESET_PIN  GET_PIN(A, 3)
 
-static rt_uint32_t *jpeg_data_buf = RT_NULL;
-static rt_uint32_t JPEG_LINE0_BUF[JPEG_LINE_SIZE * 2];
-static rt_uint32_t JPEG_LINE1_BUF[JPEG_LINE_SIZE * 2];
+static rt_uint32_t *dcmi_data_buf = RT_NULL;
+static rt_uint32_t DCMI_LINE0_BUF[DCMI_LINE_SIZE];
+static rt_uint32_t DCMI_LINE1_BUF[DCMI_LINE_SIZE];
 
 #if defined(CAMERA_DUMP)
 #define __is_print(ch) ((unsigned int)((ch) - ' ') < 127u - ' ')
@@ -73,6 +71,21 @@ static void dump_hex(const rt_uint8_t *ptr, rt_size_t buflen)
 }
 #endif
 
+static void rgb565_to_rgb888(rt_uint16_t *rgb565Color, rt_uint8_t *rgb888Color, int size)
+{
+    rt_uint16_t color;
+    rt_uint32_t i, n;
+
+    for (i=0, n=0; i<size; i++, n+=3)
+    {
+        color = rgb565Color[i];
+        rgb888Color[n]    = ((color & 0xf800) >> 11) <<3;
+        rgb888Color[n+1]  = ((color & 0x07e0) >> 5) <<2;
+        rgb888Color[n+2]  = (color &  0x001f) <<3;
+    }
+}
+
+
 static rt_err_t read_reg(struct rt_i2c_bus_device *bus, rt_uint8_t reg, rt_uint8_t len, rt_uint8_t *buf)
 {
     struct rt_i2c_msg msg[2];
@@ -82,7 +95,7 @@ static rt_err_t read_reg(struct rt_i2c_bus_device *bus, rt_uint8_t reg, rt_uint8
     msg[0].addr  = DEV_ADDRESS;
     msg[0].flags = RT_I2C_WR;
     msg[0].buf   = &reg;
-    msg[0].len   = 2;
+    msg[0].len   = 1;
 
     msg[1].addr  = DEV_ADDRESS;
     msg[1].flags = RT_I2C_RD;
@@ -448,8 +461,8 @@ rt_uint8_t ov2640_set_image_window_size(rt_uint16_t offx, rt_uint16_t offy, rt_u
    temp|=(offy>>4)&0X70;
    temp|=(hsize>>5)&0X08;
    temp|=(offx>>8)&0X07;
-   write_reg(i2c_bus, 0X55,temp);
-   write_reg(i2c_bus, 0X57,(hsize>>2)&0X80);
+   write_reg(i2c_bus, 0X55,temp);             //设置H_SIZE/V_SIZE/OFFX,OFFY的高位
+   write_reg(i2c_bus, 0X57,(hsize>>2)&0X80);  //设置H_SIZE/V_SIZE/OFFX,OFFY的高位
    write_reg(i2c_bus, 0XE0,0X00);
    return 0;
 }
@@ -470,70 +483,56 @@ rt_uint8_t ov2640_set_image_size(rt_uint16_t width ,rt_uint16_t height)
 
    return RT_EOK;
 }
-
+#include <lcd_port.h>
+extern struct drv_lcd_device _lcd;
+extern struct rt_event ov2640_event;
 void camera_dma_data_process(void)
 {
-   rt_uint16_t i;
-   rt_uint32_t *pbuf;
-   pbuf = jpeg_data_buf + jpeg_data_len;
+   //rt_uint16_t i;
+   //rt_uint32_t *pbuf;
+   //pbuf = jpeg_data_buf + jpeg_data_len;
 
-   if (DMA2_Stream1->CR & (1<<19))
-   {
-       for (i = 0; i < JPEG_LINE_SIZE; i++)
-       {
-           pbuf[i] = JPEG_LINE0_BUF[i];
-       }
-       jpeg_data_len += JPEG_LINE_SIZE;
-   }
-   else
-   {
-       for (i = 0; i < JPEG_LINE_SIZE; i++)
-       {
-           pbuf[i] = JPEG_LINE1_BUF[i];
-       }
-       jpeg_data_len += JPEG_LINE_SIZE;
-   }
-   SCB_CleanInvalidateDCache();
+//   if (DMA2_Stream1->CR & (1<<19))
+//   {
+//       for (i = 0; i < JPEG_LINE_SIZE; i++)
+//       {
+//           pbuf[i] = JPEG_LINE0_BUF[i];
+//       }
+//       _lcd.lcd_info.framebuffer
+//       jpeg_data_len += JPEG_LINE_SIZE;
+//   }
+//   else
+//   {
+//       for (i = 0; i < JPEG_LINE_SIZE; i++)
+//       {
+//           pbuf[i] = JPEG_LINE1_BUF[i];
+//       }
+//       jpeg_data_len += JPEG_LINE_SIZE;
+//   }
 }
 
 /* After a frame of picture data has been collected. */
 void camera_frame_data_process(void)
 {
-   rt_uint16_t i, rlen;
-   rt_uint32_t *pbuf = RT_NULL;
+    rt_uint16_t i;
+    rt_uint8_t *pbuf;
+    rt_uint8_t *dbuf = _lcd.lcd_info.framebuffer;
 
-   if (jpeg_data_ok == 0)
-   {
-       __HAL_DMA_DISABLE(&hdma_dcmi);
-       while(DMA2_Stream1->CR & 0x01);
-
-       rlen = JPEG_LINE_SIZE - __HAL_DMA_GET_COUNTER(&hdma_dcmi);
-       pbuf = jpeg_data_buf + jpeg_data_len;
-
-       if (DMA2_Stream1->CR & (1<<19))
-       {
-           for (i = 0; i < rlen; i++)
-           {
-               pbuf[i] = JPEG_LINE1_BUF[i];
-           }
-       }
-       else
-       {
-           for (i = 0; i < rlen; i++)
-           {
-               pbuf[i] = JPEG_LINE0_BUF[i];
-           }
-       }
-       jpeg_data_len += rlen;
-       jpeg_data_ok   = 1;
-   }
-   if (jpeg_data_ok==2)
-   {
-       DMA2_Stream1->NDTR = JPEG_LINE_SIZE;
-       DMA2_Stream1->CR  |= 1<<0;
-       jpeg_data_ok  = 0;
-       jpeg_data_len = 0;
-   }
+    if (DMA2_Stream1->CR & (1<<19))
+    {
+        pbuf = (rt_uint8_t *)DCMI_LINE1_BUF;
+    }
+    else
+    {
+        pbuf = (rt_uint8_t *)DCMI_LINE0_BUF;
+    }
+    SCB_CleanInvalidateDCache();
+    for(i=0; i<240; i++)
+    {
+        //rt_memcpy(dbuf+ (i*800*2), pbuf + (i*320*2), 320*2);
+        rgb565_to_rgb888((rt_uint16_t *)(pbuf + (i*320*2)), dbuf+ (i*320*3), 320);
+    }
+    rt_event_send(&ov2640_event, 1);
 }
 
 int rt_ov2640_init(void)
@@ -543,11 +542,11 @@ int rt_ov2640_init(void)
     rt_device_t dcmi_dev = RT_NULL;
 
     /* ov2640 reset */
-    rt_pin_mode(RESET_PIN, PIN_MODE_OUTPUT);
-    rt_pin_write(RESET_PIN, PIN_LOW);
-    rt_thread_delay(20);
-    rt_pin_write(RESET_PIN, PIN_HIGH);
-    rt_thread_delay(20);
+//    rt_pin_mode(RESET_PIN, PIN_MODE_OUTPUT);
+//    rt_pin_write(RESET_PIN, PIN_LOW);
+//    rt_thread_delay(20);
+//    rt_pin_write(RESET_PIN, PIN_HIGH);
+//    rt_thread_delay(20);
 
     i2c_bus = rt_i2c_bus_device_find(I2C_NAME);
     if (i2c_bus == RT_NULL)
@@ -583,13 +582,13 @@ int rt_ov2640_init(void)
         write_reg(i2c_bus, ov2640_svga_init_reg_tbl[i][0], ov2640_svga_init_reg_tbl[i][1]);
     }
 
-    ov2640_rgb565_mode();
     ov2640_set_light_mode(0);
     ov2640_set_color_saturation(3);
     ov2640_set_brightness(4);
     ov2640_set_contrast(3);
-    ov2640_jpeg_mode();
-    ov2640_set_image_window_size(0, 0, 320, 240);
+    //ov2640_jpeg_mode();
+    ov2640_rgb565_mode();
+    //ov2640_set_image_window_size(0, 0, 320, 240);
     ov2640_set_image_out_size(320, 240);
 
     dcmi_dev = rt_device_find("dcmi");
@@ -600,93 +599,28 @@ int rt_ov2640_init(void)
     }
     rt_device_open(dcmi_dev, RT_DEVICE_FLAG_RDWR);
 
-   jpeg_data_buf = rt_malloc(JPEG_BUF_SIZE);
-   if (RT_NULL == jpeg_data_buf)
-   {
-       rt_kprintf("jpeg data buf malloc error!\n");
-       return RT_ERROR;
-   }
+//   dcmi_data_buf = rt_malloc(DCMI_BUF_SIZE);
+//   if (RT_NULL == dcmi_data_buf)
+//   {
+//       rt_kprintf("jpeg data buf malloc error!\n");
+//       return RT_ERROR;
+//   }
 
     /* start dcmi capture */
-    rt_hw_dcmi_dma_config((rt_uint32_t)JPEG_LINE0_BUF, (rt_uint32_t)JPEG_LINE1_BUF, JPEG_LINE_SIZE);
+    rt_hw_dcmi_dma_config((rt_uint32_t)DCMI_LINE0_BUF, (rt_uint32_t)DCMI_LINE1_BUF, DCMI_LINE_SIZE);
 
     rt_kprintf("camera init success!\n");
-
     return RT_EOK;
 }
-INIT_APP_EXPORT(rt_ov2640_init);
+//INIT_APP_EXPORT(rt_ov2640_init);
 
 int camera_sample(int argc, char **argv)
 {
-   rt_err_t result = RT_EOK;
-   int fd = -1;
-   rt_uint32_t i, jpg_start, jpg_len;
-   rt_uint8_t jpg_head = 0;
-   rt_uint8_t *p = RT_NULL;
-
-   if (argc != 2)
-   {
-       rt_kprintf("Usage:\n");
-       rt_kprintf("camera_sample file.jpg\n");
-       return -1;
-   }
-
-   DCMI_Start();
-
-   while (1)
-   {
-       while (jpeg_data_ok != 1);
-       jpeg_data_ok = 2;
-       while (jpeg_data_ok != 1);
-       DCMI_Stop();
-
-       p = (rt_uint8_t *)jpeg_data_buf;
-       jpg_len  = 0;
-       jpg_head = 0;
-       for (i = 0; i < jpeg_data_len * 4; i++)
-       {
-           /* jpg head */
-           if ((p[i] == 0xFF) && (p[i + 1] == 0xD8))
-           {
-               jpg_start = i;
-               jpg_head = 1;
-           }
-           /* jpg end */
-           if ((p[i] == 0xFF) && (p[i + 1] == 0xD9) && jpg_head)
-           {
-               jpg_len = i - jpg_start + 2; /* a picture len */
-               break;
-           }
-       }
-       if (jpg_len)
-       {
-           p += jpg_start;
-           fd = open(argv[1], O_WRONLY | O_CREAT);
-           if (fd < 0)
-           {
-               rt_kprintf("open file for recording failed!\n");
-               result = -RT_ERROR;
-               goto _exit;
-           }
-           else
-           {
-               write(fd, p, jpg_len);
-               close(fd);
-               rt_kprintf("%s picture capture complate!\n", argv[1]);
-               break;
-           }
-       }
-       else
-       {
-           rt_kprintf("jpg_len error!\n");
-           result = -RT_ERROR;
-           goto _exit;
-       }
-   }
-
-_exit:
+    rt_err_t result = RT_EOK;
+    rt_ov2640_init();
+    DCMI_Start();
     return result;
 }
-MSH_CMD_EXPORT(camera_sample, record picture to a jpg file);
+MSH_CMD_EXPORT(camera_sample, start the camera);
 
 #endif

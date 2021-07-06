@@ -178,7 +178,7 @@ static int SDRAM_Init(void)
     {
         /* Program the SDRAM external device */
         SDRAM_Initialization_Sequence(&hsdram1, &command);
-        LOG_D("sdram init success, mapped at 0x%X, size is %d bytes, data width is %d", SDRAM_BANK_ADDR, SDRAM_SIZE, SDRAM_DATA_WIDTH);
+        LOG_E("sdram init success, mapped at 0x%X, size is %d bytes, data width is %d", SDRAM_BANK_ADDR, SDRAM_SIZE, SDRAM_DATA_WIDTH);
 #ifdef RT_USING_MEMHEAP_AS_HEAP
         /* If RT_USING_MEMHEAP_AS_HEAP is enabled, SDRAM is initialized to the heap */
         rt_memheap_init(&system_heap, "sdram", (void *)SDRAM_BANK_ADDR, SDRAM_SIZE);

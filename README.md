@@ -2,9 +2,11 @@
 
 [TOC]
 
-> @Version：V0.1.0
->
-> @Author: lebhoryi@gmail.com
+| Version | Date       | Description                                                  | Other |
+| ------- | ---------- | ------------------------------------------------------------ | ----- |
+| v0.1.0  | 2021/07/06 | 火灾检测模型部署到 ART-PI 中                                 |       |
+| v0.2.0  | 2021/07/06 | 1. 新增 LCD 和 摄像头驱动;<br>2. 新增使用命令之后 logo 1s 显示 |       |
+|         |            |                                                              |       |
 
 怎么把生成 ART-PI，怎么使用 RT-AK，怎么使用 RT-Thread Sdutio 编译代码，请看下面这个链接：
 
@@ -48,7 +50,7 @@ D:.
 
 ## 2. 元件
 
-无
+多媒体扩展版
 
 ## 3. 步骤
 
@@ -106,6 +108,10 @@ uint8_t *out = (uint8_t *)rt_ai_output(model, 0);
 ![image-20210706142445929](https://gitee.com/lebhoryi/PicGoPictureBed/raw/master/img/20210706142450.png)
 
 ## 4. 运行结果
+
+输入 fire_app 之后会有 1s 的logo 显示，然后黑屏
+
+![image](https://git.rt-thread.com/research/edge-ai-group/edge-ai/uploads/2a07cab8ad365f5cd4477cbde603241e/image.png)
 
 ![image-20210706142543669](https://gitee.com/lebhoryi/PicGoPictureBed/raw/master/img/20210706142546.png)
 

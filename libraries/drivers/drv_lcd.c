@@ -348,6 +348,10 @@ __exit:
 }
 INIT_DEVICE_EXPORT(drv_lcd_hw_init);
 
+rt_uint8_t *getlcdbuff(void)
+{
+   return (rt_uint8_t *)_lcd.lcd_info.framebuffer;
+}
 #ifndef ART_PI_TouchGFX_LIB
 #ifdef DRV_DEBUG
 #ifdef FINSH_USING_MSH
@@ -361,7 +365,7 @@ int lcd_test()
         if (lcd->lcd_info.pixel_format == RTGRAPHIC_PIXEL_FORMAT_RGB565)
          {
             /* red */
-            for (int i = 0; i < LCD_BUF_SIZE / 2; i++)
+            for (int i = 800*200; i < 800*(300+136); i++)
             {
                 lcd->lcd_info.framebuffer[2 * i] = 0x00;
                 lcd->lcd_info.framebuffer[2 * i + 1] = 0xF8;
@@ -369,7 +373,7 @@ int lcd_test()
             lcd->parent.control(&lcd->parent, RTGRAPHIC_CTRL_RECT_UPDATE, RT_NULL);
             rt_thread_mdelay(1000);
             /* green */
-            for (int i = 0; i < LCD_BUF_SIZE / 2; i++)
+            for (int i = 800*200; i <  800*(300+136); i++)
             {
                 lcd->lcd_info.framebuffer[2 * i] = 0xE0;
                 lcd->lcd_info.framebuffer[2 * i + 1] = 0x07;
@@ -377,7 +381,7 @@ int lcd_test()
             lcd->parent.control(&lcd->parent, RTGRAPHIC_CTRL_RECT_UPDATE, RT_NULL);
             rt_thread_mdelay(1000);
             /* blue */
-            for (int i = 0; i < LCD_BUF_SIZE / 2; i++)
+            for (int i = 800*200; i <  800*(300+136); i++)
             {
                 lcd->lcd_info.framebuffer[2 * i] = 0x1F;
                 lcd->lcd_info.framebuffer[2 * i + 1] = 0x00;
@@ -420,6 +424,27 @@ int lcd_test()
 
 }
 MSH_CMD_EXPORT(lcd_test, lcd_test);
+
+
+int lcd_pin_test(int argc, char **argv)
+{
+    struct drv_lcd_device *lcd;
+    lcd = (struct drv_lcd_device *)rt_device_find("lcd");
+    rt_uint16_t *framebuffer;
+    int x, y,i,j;
+
+    x = atoi(argv[1]);
+    y = atoi(argv[2]);
+    framebuffer = (rt_uint16_t *)lcd->lcd_info.framebuffer;
+
+    for(i=0; i<y; i++)
+    {
+        framebuffer[x+i] = 0xF800;
+    }
+
+    lcd->parent.control(&lcd->parent, RTGRAPHIC_CTRL_RECT_UPDATE, RT_NULL);
+}
+MSH_CMD_EXPORT(lcd_pin_test, lcd_test);
 #endif /* FINSH_USING_MSH */
 #endif /* DRV_DEBUG */
 #endif /* BSP_USING_LCD */

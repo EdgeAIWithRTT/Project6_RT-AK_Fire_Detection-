@@ -33,7 +33,7 @@
 
 #define LCD_CLEAR_SEND_NUMBER (320 * 480 *3)
 
-static rt_uint32_t BACK_COLOR = WHITE, FORE_COLOR = BLACK;
+static rt_uint32_t BACK_COLOR = WHITE, FORE_COLOR = RED;
 static struct rt_spi_device *spi_dev_lcd;
 
 static int rt_hw_lcd_config(void)
@@ -860,20 +860,6 @@ rt_err_t lcd_show_image(rt_uint16_t x, rt_uint16_t y, rt_uint16_t length, rt_uin
 
     return RT_EOK;
 }
-
-struct drv_lcd_device
-{
-    struct rt_device parent;
-
-    struct rt_device_graphic_info lcd_info;
-
-    struct rt_semaphore lcd_lock;
-
-    /* 0:front_buf is being used 1: back_buf is being used*/
-    rt_uint8_t cur_buf;
-    rt_uint8_t *front_buf;
-    rt_uint8_t *back_buf;
-};
 
 struct drv_lcd_device _lcd;
 

@@ -10,7 +10,6 @@
  * 2019-06-10     SummerGift   optimize PHY state detection process
  * 2019-09-03     xiaofan      optimize link change detection process
  * 2020-07-17     wanghaijing  support h7
- * 2020-11-30     wanghaijing  add phy reset
  */
 
 #include<rtthread.h>
@@ -58,7 +57,6 @@ static ETH_HandleTypeDef EthHandle;
 static ETH_TxPacketConfig TxConfig;
 static struct rt_stm32_eth stm32_eth_device;
 static uint8_t PHY_ADDR = 0x1F;
-static rt_uint32_t reset_pin = 0;
 
 #if defined ( __ICCARM__ ) /*!< IAR Compiler */
 #pragma location=0x30040000
@@ -105,14 +103,7 @@ static void dump_hex(const rt_uint8_t *ptr, rt_size_t buflen)
 }
 #endif
 
-static void phy_reset(void)
-{
-    rt_pin_write(reset_pin, PIN_LOW);
-    rt_thread_mdelay(50);
-    rt_pin_write(reset_pin, PIN_HIGH);
-}
-
-
+extern void phy_reset(void);
 /* EMAC initialization function */
 static rt_err_t rt_stm32_eth_init(rt_device_t dev)
 {
@@ -500,10 +491,6 @@ static void phy_monitor_thread_entry(void *parameter)
 static int rt_hw_stm32_eth_init(void)
 {
     rt_err_t state = RT_EOK;
-    reset_pin = rt_pin_get(ETH_RESET_PIN);
-
-    rt_pin_mode(reset_pin, PIN_MODE_OUTPUT);
-    rt_pin_write(reset_pin, PIN_HIGH);
 
     stm32_eth_device.ETH_Speed = ETH_SPEED_100M;
     stm32_eth_device.ETH_Mode = ETH_FULLDUPLEX_MODE;
