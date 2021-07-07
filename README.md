@@ -109,9 +109,16 @@ uint8_t *out = (uint8_t *)rt_ai_output(model, 0);
 
 ## 4. 运行结果
 
-输入 fire_app 之后会有 1s 的logo 显示，然后黑屏
+开机屏幕是白色的，
+
+当在终端输入 fire_app 之后会有 1s 的 logo 显示，然后黑屏。之后终端输出推理结果。
 
 ![image](https://git.rt-thread.com/research/edge-ai-group/edge-ai/uploads/2a07cab8ad365f5cd4477cbde603241e/image.png)
 
 ![image-20210706142543669](https://gitee.com/lebhoryi/PicGoPictureBed/raw/master/img/20210706142546.png)
 
+---
+
+**感谢名单：**
+
+- Derekduke
