@@ -7,6 +7,9 @@
  * @FilePath: /art_pi/applications/fire_detection.c
  * @Description: fire detection demo app
  */
+#include <rtthread.h>
+#include "drv_common.h"
+#include <rtdevice.h>
 #include "drv_spi_ili9488.h"  // spi lcd driver
 #include <lcd_spi_port.h>  // lcd ports
 
@@ -14,25 +17,36 @@
 #include <rt_ai_fire_model.h>
 #include <rt_ai.h>
 #include <rt_ai_log.h>
+#include <backend_cubeai.h>
 #include <logo.h>
-#include <test.h>
+
+#define LED_PIN GET_PIN(I, 8)
 
 struct rt_event ov2640_event;
+rt_ai_buffer_t ai_flag = 0;
 
 void ai_run_complete(void *arg){
     *(int*)arg = 1;
 }
 
+void ai_camera();
 void bilinera_interpolation(rt_uint8_t *in_array, short height, short width,
                             rt_uint8_t *out_array, short out_height, short out_width);
 
 int fire_app(void){
+    /* init spi data notify event */
+    rt_event_init(&ov2640_event, "ov2640", RT_IPC_FLAG_FIFO);
+
+    struct drv_lcd_device *lcd;
+    struct rt_device_rect_info rect_info = {0, 0, LCD_WIDTH, 240};
+    lcd = (struct drv_lcd_device *)rt_device_find("lcd");
+
     lcd_show_image(0, 0, 320, 240, LOGO);
     lcd_show_string(90, 140, 16, "Hello RT-Thread!");
     lcd_show_string(90, 156, 16, "Demo: Fire Detection");
-    lcd_show_image(0, 0, 320, 240, TEST);
+    rt_thread_mdelay(1000);
 
-    rt_err_t result = RT_EOK;
+//    rt_err_t result = RT_EOK;
     int ai_run_complete_flag = 0;
 
     /* find a registered model handle */
@@ -40,46 +54,66 @@ int fire_app(void){
     model = rt_ai_find(RT_AI_FIRE_MODEL_NAME);
     if(!model) {rt_kprintf("ai model find err\r\n"); return -1;}
 
-
-#if 1
-    /* init the model and allocate memory */
-    rt_ai_buffer_t *work_buffer = rt_malloc(RT_AI_FIRE_WORK_BUFFER_BYTES+RT_AI_FIRE_IN_TOTAL_SIZE_BYTES+RT_AI_FIRE_OUT_TOTAL_SIZE_BYTES);
-    result = rt_ai_init(model, work_buffer);
-    if (result != 0) {rt_kprintf("ai model init err\r\n"); return -1;}
-
-    /* prepare input data */
+    // allocate input memory
     rt_ai_buffer_t *input_image = rt_malloc(RT_AI_FIRE_IN_1_SIZE_BYTES);
-    if (!input_image) {rt_kprintf("malloc input memory err\n"); return -1;}
+    if (!input_image) {rt_kprintf("malloc err\n"); return -1;}
 
-    // resize
-    bilinera_interpolation(TEST, 240, 320, input_image, 64, 64);
+    // allocate calculate memory
+    rt_ai_buffer_t *work_buf = rt_malloc(RT_AI_FIRE_WORK_BUFFER_BYTES);
+    if (!work_buf) {rt_kprintf("malloc err\n"); return -1;}
 
-    rt_memcpy(model->input[0], input_image, RT_AI_FIRE_IN_1_SIZE_BYTES);
+    // allocate output memory
+    rt_ai_buffer_t *_out = rt_malloc(RT_AI_FIRE_OUT_1_SIZE_BYTES);
+    if (!_out) {rt_kprintf("malloc err\n"); return -1;}
 
-    /* run ai model */
-    result = rt_ai_run(model, ai_run_complete, &ai_run_complete_flag);
-    if (result != 0) {rt_kprintf("ai model run err\r\n"); return -1;}
+    // ai model init
+    rt_ai_buffer_t model_init = rt_ai_init(model, work_buf);
+    if (model_init != 0) {rt_kprintf("ai init err\n"); return -1;}
+    rt_ai_config(model, CFG_INPUT_0_ADDR, input_image);
+    rt_ai_config(model, CFG_OUTPUT_0_ADDR, _out);
 
-    /* get output and post-process the output */
-    uint8_t *pred;
-    if(ai_run_complete_flag){
-        pred = (uint8_t *)rt_ai_output(model, 0);
-        rt_kprintf("prediction: %d %d\n", pred[0], pred[1]);
-        // AI_LOG("Prediction: %d\n", prediction);
+    ai_camera();
+
+    while(1)
+    {
+        rt_pin_write(LED_PIN, PIN_LOW);
+        rt_event_recv(&ov2640_event,
+                            1,
+                            RT_EVENT_FLAG_AND | RT_EVENT_FLAG_CLEAR,
+                            RT_WAITING_FOREVER,
+                            RT_NULL);
+        rt_pin_write(LED_PIN, PIN_HIGH);
+        lcd->parent.control(&lcd->parent, RTGRAPHIC_CTRL_RECT_UPDATE, &rect_info);
+        if (ai_flag > 0)
+        {
+            // resize
+            bilinera_interpolation(lcd->lcd_info.framebuffer, 240, 320, input_image, 64, 64);
+            rt_ai_run(model, NULL, NULL);
+            uint8_t *out = (uint8_t *)rt_ai_output(model, 0);
+            rt_kprintf("pred: %d %d\n", out[0], out[1]);
+            if (out[0] > 200)
+                lcd_show_string(20, 20, 16, "Fire");
+            else
+                lcd_show_string(20, 20, 16, "No Fire");
+        }
+        DCMI_Start();
     }
-    rt_free(work_buffer);
+    rt_free(input_image);
+    rt_free(work_buf);
+    rt_free(_out);
 
-
-
-    if (pred[0] > 200)
-        lcd_show_string(20, 20, 16, "Fire");
-    else
-        lcd_show_string(20, 20, 16, "No Fire");
-#endif
     return 0;
 }
 MSH_CMD_EXPORT(fire_app,fire demo);
 //INIT_COMPONENT_EXPORT(fire_app);
+
+
+void ai_camera()
+{
+    rt_gc0328c_init();
+    ai_flag = 1;
+    DCMI_Start();
+}
 
 
 int is_in_array(short x, short y, short height, short width)

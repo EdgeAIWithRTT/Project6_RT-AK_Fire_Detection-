@@ -7,6 +7,7 @@
 | v0.1.0  | 2021/07/06 | 火灾检测模型部署到 ART-PI 中                                 |            |
 | v0.2.0  | 2021/07/06 | 1. 新增 LCD 和 摄像头驱动;<br>2. 新增使用命令之后 logo 1s 显示 |            |
 | v0.2.1  | 2021/07/07 | 新增 c 代码版本的尺度转换，输入 320x240 转成 64x64           | 双线性插值 |
+| v0.3.0  | 2021/07/07 | 新增摄像头 ov2640 支持                                       |            |
 
 怎么把生成 ART-PI，怎么使用 RT-AK，怎么使用 RT-Thread Sdutio 编译代码，请看下面这个链接：
 
@@ -50,7 +51,8 @@ D:.
 
 ## 2. 元件
 
-多媒体扩展版
+- 多媒体扩展版
+- gc0328
 
 ## 3. 步骤
 
@@ -111,15 +113,15 @@ uint8_t *out = (uint8_t *)rt_ai_output(model, 0);
 
 开机屏幕是白色的，
 
-当在终端输入 fire_app 之后会有 1s 的 logo 显示，然后显示输入图片和结果。之后终端输出推理结果。
-
-因为模型的输入是 320x240 大小的图片经过尺度缩放（双线性插值算法）之后获得的，所以跟之前的结果稍微有点出入。
+当在终端输入 fire_app 之后会有 1s 的 logo 显示，然后实时显示推理结果。
 
 ![image](https://git.rt-thread.com/research/edge-ai-group/edge-ai/uploads/2a07cab8ad365f5cd4477cbde603241e/image.png)
 
-![image-20210708161905392](https://gitee.com/lebhoryi/PicGoPictureBed/raw/master/img/20210708161905.png)
+![image-20210708173425300](https://gitee.com/lebhoryi/PicGoPictureBed/raw/master/img/20210708173425.png)
 
-![image-20210708161623701](C:\Users\12813\AppData\Roaming\Typora\typora-user-images\image-20210708161623701.png)
+![image-20210708173351174](https://gitee.com/lebhoryi/PicGoPictureBed/raw/master/img/20210708173429.png)
+
+
 
 ---
 
