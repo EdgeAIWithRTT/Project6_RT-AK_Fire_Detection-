@@ -97,6 +97,7 @@ int fire_app(void){
                 lcd_show_string(20, 20, 16, "No Fire");
         }
         DCMI_Start();
+
     }
     rt_free(input_image);
     rt_free(work_buf);
