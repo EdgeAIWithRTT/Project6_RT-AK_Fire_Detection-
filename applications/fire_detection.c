@@ -52,7 +52,7 @@ int fire_app(void){
     if (!input_image) {rt_kprintf("malloc input memory err\n"); return -1;}
 
     // resize
-    bilinera_interpolation(TEST, 240, 320, input_image, 64, 64);
+    bilinera_interpolation((rt_uint8_t *)TEST, 240, 320, input_image, 64, 64);
 
     rt_memcpy(model->input[0], input_image, RT_AI_FIRE_IN_1_SIZE_BYTES);
 
